@@ -1,0 +1,207 @@
+name: CI & Release
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - release/*
+      - hotfix/*
+  pull_request:
+    branches:
+      - main
+      - develop
+
+# Opcional: Permisos mínimos por defecto (buena práctica)
+permissions:
+  contents: read
+
+jobs:
+  # --- Verificaciones Base (Lint, Test, Build) ---
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necesario para que Changesets compare con la rama base
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # O la versión LTS que uses
+
+      - name: Setup npm Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Lint
+        run: npm run lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup npm Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Tests
+        run: npm run test
+
+      # Opcional: Subir coverage a Codecov u otro servicio
+      # - name: Upload coverage reports to Codecov
+      #   uses: codecov/codecov-action@v4
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }} # Necesitas añadir este secret
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup npm Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Build
+        run: npm run build
+
+  # --- Automatización de Release con Changesets (Opcional recomendado) ---
+  release:
+    name: Release PR / Publish
+    runs-on: ubuntu-latest
+    # Ejecutar solo en push a 'develop' (para crear PR) o 'main' (para publicar)
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    needs: [lint, test, build] # Ejecutar solo si las verificaciones pasan
+
+    # Permisos necesarios para la acción de Changesets
+    permissions:
+      contents: write # Para crear/actualizar la PR, hacer commit de versiones, crear tags
+      pull-requests: write # Para crear/actualizar la PR de release
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup npm Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Create Release Pull Request or Publish to npm
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          # Si estás en 'develop', crea/actualiza PR. Si estás en 'main', versiona y publica.
+          # (La acción intenta ser inteligente, pero puedes forzar 'publish' o 'version')
+          # publish: npm run changeset:publish # Comando para publicar
+          # version: npm run changeset:version # Comando para versionar localmente (si no quieres publicar desde CI)
+          title: 'chore: upcoming release' # Título para la PR de release
+          commit: 'chore: update versions' # Mensaje de commit para el versionado
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Necesario para la acción
+          # NPM_TOKEN: ${{ secrets.NPM_TOKEN }} # Necesario si 'publish' publica en npm
+
+  # --- Esbozo de Jobs de Despliegue (Necesitan lógica real) ---
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    # Ejecutar solo en push a 'develop' y si el release (o build) fue exitoso
+    if: github.ref == 'refs/heads/develop' && needs.build.result == 'success' # O needs.release.result == 'success' si depende de la PR
+    needs: [build] # O [release]
+    environment: staging # Define un entorno de GitHub (opcional)
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        # ... (Setup Node, Cache, Install) ...
+      - name: Install Dependencies
+        run: npm ci
+      - name: Build Affected
+        run: npm run build
+      - name: Run Deploy Staging
+        run: |
+          echo "Deploying affected projects to Staging..."
+          # Ejemplo: w3m deploy staging -- --region eu-west-1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
+          # ... otras variables/secrets necesarios
+
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    # Ejecutar solo en push a 'main' y si el release fue exitoso
+    if: github.ref == 'refs/heads/main' && needs.release.result == 'success'
+    needs: [release]
+    environment: production
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        # ... (Setup Node, Cache, Install) ...
+      - name: Install Dependencies
+        run: npm ci
+      - name: Build Affected
+        run: npm run build
+      - name: Run Deploy Production
+        run: |
+          echo "Deploying affected projects to Production..."
+          # Ejemplo: w3m deploy production -- --region us-east-1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          # ...

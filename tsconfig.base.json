@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    /* Base Options: */
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "ES2022",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    /* Strictness */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    /* If NOT transpiling with tsconfig.json, ensure imports are types */
+    "importsNotUsedAsValues": "error",
+    /* Module Resolution */
+    "module": "NodeNext", // O "CommonJS" si prefieres, pero NodeNext es más moderno
+    "moduleResolution": "NodeNext", // Coherente con 'module'
+    "baseUrl": ".", // Permite imports basados en la raíz
+    // "paths": { // Descomenta y configura si usarás alias
+    //   "@libs/*": ["libs/*"],
+    //   "@apps/*": ["apps/*"]
+    // },
+    /* Output */
+    "declaration": true, // Generalmente quieres esto habilitado para libs
+    "sourceMap": true, // Útil para debugging
+    "outDir": "dist", // Directorio de salida común (puede ser sobreescrito por paquetes)
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true
+  }
+  // "exclude": ["node_modules", "dist"] // Exclusiones globales
+}

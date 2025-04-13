@@ -1,0 +1,46 @@
+{
+  "name": "@w3move/monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Yet another modern monorepo template",
+  "author": "github.com/w3move",
+  "scripts": {
+    "prepare": "husky",
+    "build": "echo Not implemented w3m build",
+    "lint": "echo Not implemented w3m lint",
+    "test": "echo Not implemented w3m test",
+    "typecheck": "echo Not implemented w3m typecheck",
+    "nvm": "nvm use",
+    "changeset:add": "changeset add",
+    "changeset:version": "changeset version",
+    "changeset:publish": "changeset publish"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.7.1",
+    "@commitlint/config-conventional": "^19.7.1",
+    "@commitlint/types": "^19.5.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.13.5",
+    "husky": "^9.1.7",
+    "jest": "^29.7.0",
+    "lint-staged": "^15.4.3",
+    "prettier": "3.5.0",
+    "rimraf": "^6.0.1",
+    "ts-jest": "^29.2.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  },
+  "workspaces": [
+    "tools/*",
+    "libs/*",
+    "funcs/*",
+    "servs/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": "22.14.0",
+    "npm": "10.9.2"
+  },
+  "packageManager": "npm@10.9.2",
+  "license": "MIT"
+}

@@ -1,0 +1,8 @@
+# Ignora directorios comunes
+node_modules
+dist
+coverage
+.changeset
+
+# Ignora archivos generados o específicos
+package-lock.json

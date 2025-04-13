@@ -1,0 +1,3 @@
+{
+  "extends": "./tools/client/config/tsconfig.base.json"
+}
