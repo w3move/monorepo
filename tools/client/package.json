@@ -1,7 +1,7 @@
 {
   "name": "dxcli",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "bin/cli.js",
   "bin": {
     "w3m": "bin/cli.js"
   },

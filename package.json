@@ -6,7 +6,7 @@
   "author": "github.com/w3move",
   "scripts": {
     "prepare": "husky",
-    "build": "echo Not implemented w3m build",
+    "build": "w3m build",
     "lint": "echo Not implemented w3m lint",
     "test": "echo Not implemented w3m test",
     "typecheck": "echo Not implemented w3m typecheck",
