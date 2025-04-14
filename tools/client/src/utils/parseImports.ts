@@ -1,24 +1,25 @@
-import { parse } from "@swc/core";
-import { readFileSync } from "fs";
+import { parse } from '@swc/core';
+import { readFileSync } from 'fs';
 
 export const extractImports = async (filePath: string): Promise<string[]> => {
-  const content = readFileSync(filePath, "utf-8");
+  const content = readFileSync(filePath, 'utf-8');
   const ast = await parse(content, {
-    syntax: "typescript",
+    syntax: 'typescript',
     decorators: true,
-    tsx: filePath.endsWith(".tsx"),
+    tsx: filePath.endsWith('.tsx'),
   });
   const imports: string[] = [];
 
   ast.body.forEach((node) => {
-    if (node.type === "ImportDeclaration") {
+    if (node.type === 'ImportDeclaration') {
       imports.push(node.source.value);
-    } else if (node.type === "VariableDeclaration") {
+    } else if (node.type === 'VariableDeclaration') {
       node.declarations.forEach((decl) => {
         if (
-          decl.init?.type === "CallExpression" &&
-          decl.init.callee.type === "Identifier" &&
-          decl.init.callee.value === "require"
+          decl.init?.type === 'CallExpression' &&
+          decl.init.callee.type === 'Identifier' &&
+          decl.init.callee.value === 'require' &&
+          decl.init?.arguments?.[0]?.expression?.type
         ) {
           imports.push(decl.init.arguments[0].expression.type);
         }

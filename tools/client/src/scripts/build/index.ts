@@ -1,4 +1,3 @@
-// scripts/build/index.ts
 import { transformFileSync } from '@swc/core';
 import * as crypto from 'crypto';
 import {
@@ -11,38 +10,11 @@ import {
 } from 'fs';
 import { dirname, join, relative, resolve } from 'path';
 import { performance } from 'perf_hooks';
+import ts from 'typescript';
 import * as colors from '../../utils/colors';
+import { resolveProjectContext } from '../../utils/context';
 import { extractImports } from '../../utils/parseImports';
 import show from '../../utils/show';
-
-const findWorkspaceRoot = (startPath: string): string => {
-  let current = resolve(startPath);
-  while (current !== '/') {
-    const pkgPath = join(current, 'package.json');
-    if (existsSync(pkgPath)) {
-      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-      if (pkg.workspaces) return current;
-    }
-    current = dirname(current);
-  }
-  return process.cwd();
-};
-
-const getWorkspaces = (workspaceRoot: string): string[] => {
-  const pkgPath = join(workspaceRoot, 'package.json');
-  if (!existsSync(pkgPath)) return [];
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-  const workspaces: string[] = pkg.workspaces || [];
-  return workspaces
-    .flatMap((pattern) => {
-      const base = pattern.replace(/\*$|\/\*$/, '');
-      const full = join(workspaceRoot, base);
-      return existsSync(full)
-        ? readdirSync(full).map((p) => join(full, p))
-        : [];
-    })
-    .filter((p) => statSync(p).isDirectory());
-};
 
 const getHash = (data: string) =>
   crypto.createHash('sha256').update(data).digest('hex').slice(0, 8);
@@ -76,10 +48,27 @@ const buildFile = async (
   const { code } = transformFileSync(filePath, {
     jsc: {
       target: 'es2022',
-      parser: { syntax: 'typescript', decorators: true },
+      parser: { syntax: 'typescript', decorators: true, dynamicImport: true },
+      transform: {
+        decoratorMetadata: true,
+        react: {
+          runtime: 'automatic',
+          importSource: 'react',
+        },
+      },
     },
-    module: { type: 'commonjs' },
+    module: {
+      type: 'commonjs',
+      strict: true,
+      strictMode: true,
+      lazy: false,
+      noInterop: false,
+      ignoreDynamic: false,
+    },
     sourceMaps: false,
+    minify: false,
+    inlineSourcesContent: false,
+    swcrc: false,
   });
 
   mkdirSync(dirname(outputPath), { recursive: true });
@@ -154,6 +143,65 @@ const buildProject = async (projectPath: string, workspaceRoot: string) => {
   }
 
   pipelineData.finalHash = calculateFinalHash(pipelineData);
+
+  const configPath = [
+    join(projectPath, 'tsconfig.json'),
+    join(workspaceRoot, '.', 'tsconfig.base.json'),
+  ].find((p) => existsSync(p));
+  if (configPath) {
+    const parsed = ts.getParsedCommandLineOfConfigFile(
+      configPath,
+      {
+        emitDeclarationOnly: true,
+        noEmit: false,
+        declaration: true,
+        outDir: join(projectPath, 'dist'),
+      },
+      {
+        ...ts.sys,
+        onUnRecoverableConfigFileDiagnostic: (d) =>
+          console.error(ts.flattenDiagnosticMessageText(d.messageText, '')),
+      }
+    );
+
+    if (parsed) {
+      const program = ts.createProgram({
+        rootNames: parsed.fileNames,
+        options: parsed.options,
+      });
+      const emitResult = program.emit();
+
+      const diagnostics = ts
+        .getPreEmitDiagnostics(program)
+        .concat(emitResult.diagnostics);
+      if (diagnostics.length > 0) {
+        console.warn(
+          colors.yellow(
+            `⚠️  TSC generó advertencias al emitir tipos en ${relative(workspaceRoot, projectPath)}`
+          )
+        );
+        for (const diagnostic of diagnostics) {
+          if (diagnostic.file) {
+            const { line, character } =
+              diagnostic.file.getLineAndCharacterOfPosition(
+                diagnostic.start || 0
+              );
+            const message = ts.flattenDiagnosticMessageText(
+              diagnostic.messageText,
+              '\n'
+            );
+            console.warn(
+              ` · ${diagnostic.file.fileName.replace(projectPath, '.').replace(workspaceRoot, '.')} (${line + 1},${character + 1}): ${message}`
+            );
+          } else {
+            console.warn(
+              ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
+            );
+          }
+        }
+      }
+    }
+  }
   mkdirSync(dirname(pipelinePath), { recursive: true });
   writeFileSync(pipelinePath, JSON.stringify(pipelineData, null, 2));
 
@@ -173,23 +221,43 @@ export const build = async (inputPath?: string) => {
     process.exit(1);
   }
 
-  const workspaceRoot = findWorkspaceRoot(path);
+  const context = resolveProjectContext(path);
 
-  if (path === workspaceRoot) {
-    const workspaces = getWorkspaces(workspaceRoot);
-    if (workspaces.length === 0) {
-      console.error(colors.red('❌ No se encontraron workspaces definidos.'));
-      process.exit(1);
+  switch (context.type) {
+    case 'monorepo-root': {
+      const pkg = JSON.parse(
+        readFileSync(join(context.workspaceRoot, 'package.json'), 'utf-8')
+      );
+      const workspaces: string[] = pkg.workspaces || [];
+      const projects = workspaces
+        .flatMap((pattern) => {
+          const base = pattern.replace(/\*$|\/\*$/, '');
+          const full = join(context.workspaceRoot, base);
+          return existsSync(full)
+            ? readdirSync(full).map((p) => join(full, p))
+            : [];
+        })
+        .filter((p) => statSync(p).isDirectory());
+
+      for (const projectPath of projects) {
+        console.log(
+          colors.blue(
+            `🔍 Procesando proyecto: ${relative(context.workspaceRoot, projectPath)}`
+          )
+        );
+        await buildProject(projectPath, context.workspaceRoot);
+      }
+      break;
     }
-    for (const projectPath of workspaces) {
+    case 'monorepo-member':
+    case 'single-project': {
       console.log(
         colors.blue(
-          `🔍 Procesando proyecto: ${relative(workspaceRoot, projectPath)}`
+          `🔍 Procesando proyecto: ${relative(context.workspaceRoot, context.projectPath)}`
         )
       );
-      await buildProject(projectPath, workspaceRoot);
+      await buildProject(context.projectPath, context.workspaceRoot);
+      break;
     }
-  } else {
-    await buildProject(path, workspaceRoot);
   }
 };

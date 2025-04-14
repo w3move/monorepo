@@ -5,12 +5,14 @@ const isTTY = stdout.isTTY;
 
 const useEmoji = isTTY && process.env.CLI_USE_EMOJI !== '0';
 const statusIcons = {
-  OK: isTTY ? colors.green(useEmoji ? '🛠️' : '✔' + ' OK ') : 'OK',
-  BUILT: isTTY ? colors.green(useEmoji ? '🛠️' : '⚒' + ' BUILT ') : 'BUILT',
-  CACHED: isTTY ? colors.cyan(useEmoji ? '💾' : '●' + ' CACHED') : 'CACHED',
-  SKIPPED: isTTY ? colors.yellow(useEmoji ? '⚠️' : '' + ' SKIPPED') : 'SKIPPED',
-  WARN: isTTY ? colors.yellow(useEmoji ? '⚠️' : '⚠' + ' WARN') : 'WARN',
-  RETRY: isTTY ? colors.yellow(useEmoji ? '⚠️' : '↺' + ' RETRY') : 'RETRY',
+  OK: isTTY ? colors.green(`${useEmoji ? '🛠️ ' : '✔'} OK `) : 'OK',
+  WARN: isTTY ? colors.yellow(`${useEmoji ? '⚠️' : '⚠'} WARN`) : 'WARN',
+  RETRY: isTTY ? colors.yellow(`${useEmoji ? '⚠️' : '↺'} RETRY`) : 'RETRY',
+  BUILT: isTTY ? colors.green(`${useEmoji ? '🛠️ ' : '⚒'} BUILT `) : 'BUILT',
+  CACHED: isTTY ? colors.cyan(`${useEmoji ? '💾' : '●'} CACHED`) : 'CACHED',
+  SKIPPED: isTTY
+    ? colors.yellow(`${useEmoji ? '⚠️' : '⚠'} SKIPPED`)
+    : 'SKIPPED',
 };
 
 export default function show(
@@ -24,7 +26,7 @@ export default function show(
   const col2 = 10;
   const col3 = 10;
   const col4 = 30;
-  const termWidth = stdout.columns > 100 ? stdout.columns - 10 : 100;
+  const termWidth = 90; //stdout.columns > 100 ? stdout.columns - 10 : 100;
   const rest = termWidth - col2 - col3 - col4;
   const col1 = rest > 40 ? rest : 40;
   const padding = ' ';
