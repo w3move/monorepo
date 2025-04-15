@@ -49,10 +49,10 @@ const buildProject = async (
   }
 
   if (opts.code || (!opts.code && !opts.types)) {
-    await buildCode(projectPath, pipelineData);
+    await buildCode(projectPath, workspaceRoot, pipelineData);
   }
   if (opts.types || (!opts.code && !opts.types)) {
-    await buildTypes(projectPath, workspaceRoot);
+    await buildTypes(projectPath, workspaceRoot, pipelineData);
   }
 
   pipelineData.finalHash = calculateFinalHash(pipelineData);

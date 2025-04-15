@@ -85,7 +85,8 @@ export const buildCodeFile = async (
 
 export const buildCode = async (
   projectPath: string,
-  pipelineData: any
+  workspaceRoot: string,
+  previousHashes: Record<string, string>
 ): Promise<void> => {
   const traverse = async (dir: string) => {
     for (const file of readdirSync(dir)) {
@@ -93,14 +94,14 @@ export const buildCode = async (
       if (statSync(fullPath).isDirectory()) {
         await traverse(fullPath);
       } else if (file.endsWith('.ts') || file.endsWith('.tsx')) {
-        await buildCodeFile(fullPath, projectPath, pipelineData);
+        await buildCodeFile(fullPath, projectPath, previousHashes);
       }
     }
   };
 
   const stats = statSync(projectPath);
   if (stats.isFile()) {
-    await buildCodeFile(projectPath, projectPath, pipelineData);
+    await buildCodeFile(projectPath, projectPath, previousHashes);
   } else {
     const srcPath = join(projectPath, 'src');
     if (existsSync(srcPath)) await traverse(srcPath);

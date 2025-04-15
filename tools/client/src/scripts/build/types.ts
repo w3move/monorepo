@@ -1,17 +1,21 @@
-import { existsSync, readFileSync } from 'fs';
+// src/scripts/build/types.ts
+import { existsSync as fsExistsSync, readFileSync } from 'fs';
 import { join, relative } from 'path';
-import * as ts from 'typescript';
+import ts from 'typescript';
 import * as colors from '../../utils/colors';
+
+const getHash = (data: string) =>
+  require('crypto').createHash('sha256').update(data).digest('hex').slice(0, 8);
 
 export async function buildTypes(
   projectPath: string,
   workspaceRoot: string,
-  previousHashes?: Record<string, string>
+  pipelineData: any
 ): Promise<void> {
   const configPath = [
     join(projectPath, 'tsconfig.json'),
     join(workspaceRoot, '.', 'tsconfig.base.json'),
-  ].find((p) => existsSync(p));
+  ].find((p) => fsExistsSync(p));
 
   if (!configPath) return;
 
@@ -32,24 +36,23 @@ export async function buildTypes(
 
   if (!parsed) return;
 
-  const crypto = require('crypto');
-  const getHash = (data: string) =>
-    crypto.createHash('sha256').update(data).digest('hex').slice(0, 8);
+  pipelineData.types = pipelineData.types || {};
 
   const filesToEmit = parsed.fileNames.filter((file) => {
-    const srcExists = existsSync(file);
     const dtsPath = join(
       projectPath,
       'dist',
       file.replace(/.*src\//, '').replace(/\.tsx?$/, '.d.ts')
     );
-    const dtsExists = existsSync(dtsPath);
+    const dtsExists = fsExistsSync(dtsPath);
+    const content = readFileSync(file, 'utf-8');
+    const hash = getHash(content);
+    const previous = pipelineData.types[file];
 
-    const content = srcExists ? readFileSync(file, 'utf-8') : '';
-    const currentHash = getHash(content);
-    const previousHash = previousHashes?.[file];
+    if (previous?.source === hash && dtsExists) return false;
 
-    return !dtsExists || currentHash !== previousHash;
+    pipelineData.types[file] = { source: hash };
+    return true;
   });
 
   if (filesToEmit.length === 0) {
